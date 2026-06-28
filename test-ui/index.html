@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Parking Auth — Test</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #f5f5f5; color: #222; min-height: 100vh; padding: 30px 20px; }
+  h1 { text-align: center; color: #2e7d32; font-size: 22px; margin-bottom: 4px; }
+  p.sub { text-align: center; color: #888; font-size: 12px; margin-bottom: 28px; }
+  .card { background: #ffffff; border-radius: 10px; padding: 20px; margin-bottom: 16px; border: 1px solid #c8e6c9; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+  .card h2 { color: #2e7d32; font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .badge { font-size: 10px; background: #2e7d32; color: white; padding: 2px 8px; border-radius: 20px; font-weight: bold; }
+  .badge.get { background: #388e3c; }
+  input { width: 100%; padding: 9px 12px; border-radius: 6px; border: 1px solid #c8e6c9; background: #f9fbe7; color: #222; font-size: 13px; margin-bottom: 8px; }
+  input:focus { outline: none; border-color: #2e7d32; background: white; }
+  button { width: 100%; padding: 10px; border-radius: 6px; border: none; background: #2e7d32; color: white; font-size: 13px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+  button:hover { background: #1b5e20; }
+  button.danger { background: #c62828; }
+  button.danger:hover { background: #b71c1c; }
+  .result { margin-top: 10px; background: #f1f8e9; border-radius: 6px; padding: 10px; font-size: 12px; font-family: monospace; white-space: pre-wrap; word-break: break-all; color: #33691e; border-left: 3px solid #2e7d32; display: none; }
+  .result.error { color: #c62828; border-left-color: #c62828; background: #ffebee; }
+  .tokens { background: #e8f5e9; border-radius: 6px; padding: 10px; margin-bottom: 16px; font-size: 11px; color: #555; display: none; border: 1px solid #c8e6c9; }
+  .tokens span { color: #2e7d32; word-break: break-all; font-weight: bold; }
+  label { font-size: 11px; color: #555; display: block; margin-bottom: 3px; }
+  .status { text-align: center; padding: 10px; border-radius: 8px; font-size: 12px; margin-bottom: 16px; font-weight: bold; }
+  .status.ok { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+  .status.fail { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+  p.hint { font-size: 12px; color: #888; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<h1>🔐 Parking Auth Service</h1>
+<p class="sub">Test de endpoints — localhost:3001</p>
+
+<div id="serverStatus" class="status fail">⚠️ Verificando servidor...</div>
+
+<div class="tokens" id="tokenBox">
+  <div>Access Token: <span id="showAccess">—</span></div>
+  <div style="margin-top:4px">Refresh Token: <span id="showRefresh">—</span></div>
+</div>
+
+<!-- REGISTER -->
+<div class="card">
+  <h2><span class="badge">POST</span> /auth/register</h2>
+  <label>Email</label>
+  <input id="reg_email" type="email" value="viviana@parking.com">
+  <label>Contraseña</label>
+  <input id="reg_pass" type="password" value="123456">
+  <button onclick="register()">Registrar usuario</button>
+  <div class="result" id="res_register"></div>
+</div>
+
+<!-- LOGIN -->
+<div class="card">
+  <h2><span class="badge">POST</span> /auth/login</h2>
+  <label>Email</label>
+  <input id="log_email" type="email" value="viviana@parking.com">
+  <label>Contraseña</label>
+  <input id="log_pass" type="password" value="123456">
+  <button onclick="login()">Iniciar sesión</button>
+  <div class="result" id="res_login"></div>
+</div>
+
+<!-- ME -->
+<div class="card">
+  <h2><span class="badge get">GET</span> /auth/me</h2>
+  <p class="hint">Usa el access token del login automáticamente.</p>
+  <button onclick="me()">Ver mi perfil</button>
+  <div class="result" id="res_me"></div>
+</div>
+
+<!-- REFRESH -->
+<div class="card">
+  <h2><span class="badge">POST</span> /auth/refresh</h2>
+  <p class="hint">Renueva el access token usando el refresh token.</p>
+  <button onclick="refresh()">Renovar token</button>
+  <div class="result" id="res_refresh"></div>
+</div>
+
+<!-- LOGOUT -->
+<div class="card">
+  <h2><span class="badge">POST</span> /auth/logout</h2>
+  <p class="hint">Cierra la sesión e invalida el refresh token.</p>
+  <button class="danger" onclick="logout()">Cerrar sesión</button>
+  <div class="result" id="res_logout"></div>
+</div>
+
+<script>
+const BASE = "http://localhost:3001";
+let accessToken = "";
+let refreshToken = "";
+
+async function call(method, path, body, resultId) {
+  const el = document.getElementById(resultId);
+  el.style.display = "block";
+  el.className = "result";
+  el.textContent = "Cargando...";
+  try {
+    const opts = { method, headers: { "Content-Type": "application/json" } };
+    if (accessToken && path === "/auth/me") opts.headers["Authorization"] = "Bearer " + accessToken;
+    if (body) opts.body = JSON.stringify(body);
+    const r = await fetch(BASE + path, opts);
+    const data = await r.json();
+    el.textContent = JSON.stringify(data, null, 2);
+    if (!r.ok) el.classList.add("error");
+    return { ok: r.ok, data };
+  } catch(e) {
+    el.textContent = "Error: " + e.message + "\n\n¿Está corriendo el servidor en localhost:3001?";
+    el.classList.add("error");
+    return { ok: false };
+  }
+}
+
+async function register() {
+  await call("POST", "/auth/register", {
+    email: document.getElementById("reg_email").value,
+    password: document.getElementById("reg_pass").value
+  }, "res_register");
+}
+
+async function login() {
+  const res = await call("POST", "/auth/login", {
+    email: document.getElementById("log_email").value,
+    password: document.getElementById("log_pass").value
+  }, "res_login");
+  if (res.ok && res.data.accessToken) {
+    accessToken = res.data.accessToken;
+    refreshToken = res.data.refreshToken;
+    document.getElementById("tokenBox").style.display = "block";
+    document.getElementById("showAccess").textContent = accessToken.substring(0,40) + "...";
+    document.getElementById("showRefresh").textContent = refreshToken;
+  }
+}
+
+async function me() {
+  if (!accessToken) {
+    const el = document.getElementById("res_me");
+    el.style.display = "block";
+    el.className = "result error";
+    el.textContent = "Primero haz login para obtener el access token.";
+    return;
+  }
+  await call("GET", "/auth/me", null, "res_me");
+}
+
+async function refresh() {
+  if (!refreshToken) {
+    const el = document.getElementById("res_refresh");
+    el.style.display = "block";
+    el.className = "result error";
+    el.textContent = "Primero haz login para obtener el refresh token.";
+    return;
+  }
+  const res = await call("POST", "/auth/refresh", { refreshToken }, "res_refresh");
+  if (res.ok && res.data.accessToken) {
+    accessToken = res.data.accessToken;
+    document.getElementById("showAccess").textContent = accessToken.substring(0,40) + "...";
+  }
+}
+
+async function logout() {
+  if (!refreshToken) {
+    const el = document.getElementById("res_logout");
+    el.style.display = "block";
+    el.className = "result error";
+    el.textContent = "Primero haz login para obtener el refresh token.";
+    return;
+  }
+  await call("POST", "/auth/logout", { refreshToken }, "res_logout");
+  accessToken = "";
+  refreshToken = "";
+  document.getElementById("tokenBox").style.display = "none";
+}
+
+async function checkServer() {
+  const el = document.getElementById("serverStatus");
+  try {
+    await fetch(BASE + "/auth/me", { method: "GET" });
+    el.className = "status ok";
+    el.textContent = "✅ Servidor corriendo en localhost:3001";
+  } catch {
+    el.className = "status fail";
+    el.textContent = "❌ Servidor no encontrado — corre: npm run dev -- --httpPort 3001";
+  }
+}
+checkServer();
+</script>
+</body>
+</html>
