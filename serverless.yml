@@ -59,3 +59,10 @@ functions:
       - httpApi:
           path: /auth/me
           method: GET
+
+  health:
+    handler: src/handlers/auth.health
+    events:
+      - httpApi:
+          path: /
+          method: GET

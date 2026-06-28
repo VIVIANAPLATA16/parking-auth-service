@@ -140,3 +140,9 @@ export const me = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxy
     return err('Token inválido o expirado', 401);
   }
 };
+
+export const health = async (): Promise<APIGatewayProxyResultV2> => {
+  return ok({
+    message: 'Parking Auth Service running',
+  });
+};
