@@ -1,0 +1,61 @@
+service: parking-auth-service
+
+frameworkVersion: '4'
+
+build:
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    target: node20
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  stage: dev
+  region: us-east-1
+  environment:
+    DATABASE_URL: ${env:DATABASE_URL}
+    JWT_ACCESS_SECRET: ${env:JWT_ACCESS_SECRET}
+    JWT_REFRESH_SECRET: ${env:JWT_REFRESH_SECRET}
+    JWT_ACCESS_EXPIRES_IN: ${env:JWT_ACCESS_EXPIRES_IN}
+    JWT_REFRESH_EXPIRES_IN: ${env:JWT_REFRESH_EXPIRES_IN}
+
+plugins:
+  - serverless-offline
+
+functions:
+  register:
+    handler: src/handlers/auth.register
+    events:
+      - httpApi:
+          path: /auth/register
+          method: POST
+
+  login:
+    handler: src/handlers/auth.login
+    events:
+      - httpApi:
+          path: /auth/login
+          method: POST
+
+  refresh:
+    handler: src/handlers/auth.refresh
+    events:
+      - httpApi:
+          path: /auth/refresh
+          method: POST
+
+  logout:
+    handler: src/handlers/auth.logout
+    events:
+      - httpApi:
+          path: /auth/logout
+          method: POST
+
+  me:
+    handler: src/handlers/auth.me
+    events:
+      - httpApi:
+          path: /auth/me
+          method: GET
