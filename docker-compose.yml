@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: parking_postgres
+    environment:
+      POSTGRES_USER: parking_user
+      POSTGRES_PASSWORD: parking_pass
+      POSTGRES_DB: parking_auth
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
