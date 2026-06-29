@@ -15,14 +15,72 @@ provider:
   stage: dev
   region: us-east-1
   environment:
-    DATABASE_URL: ${env:DATABASE_URL}
-    JWT_ACCESS_SECRET: ${env:JWT_ACCESS_SECRET}
-    JWT_REFRESH_SECRET: ${env:JWT_REFRESH_SECRET}
-    JWT_ACCESS_EXPIRES_IN: ${env:JWT_ACCESS_EXPIRES_IN}
-    JWT_REFRESH_EXPIRES_IN: ${env:JWT_REFRESH_EXPIRES_IN}
+    DATABASE_URL: env:DATABASE_URL
+    JWT_ACCESS_SECRET: env:JWT_ACCESS_SECRET
+    JWT_REFRESH_SECRET: env:JWT_REFRESH_SECRET
+    JWT_ACCESS_EXPIRES_IN: env:JWT_ACCESS_EXPIRES_IN
+    JWT_REFRESH_EXPIRES_IN: env:JWT_REFRESH_EXPIRES_IN
 
 plugins:
   - serverless-offline
+  - serverless-openapi-documenter
+
+custom:
+  documentation:
+    version: '1.0.0'
+    title: 'Parking Auth Service API'
+    description: 'Microservicio de autenticación centralizado — Parking International'
+    servers:
+      - url: https://o4w7jpo7m4.execute-api.us-east-1.amazonaws.com
+        description: AWS Lambda - us-east-1 (dev)
+      - url: http://localhost:3001
+        description: Local - serverless-offline
+    models:
+      - name: RegisterRequest
+        contentType: application/json
+        schema:
+          type: object
+          required: [email, password]
+          properties:
+            email:
+              type: string
+              format: email
+              example: usuario@parking.com
+            password:
+              type: string
+              minLength: 6
+              example: "123456"
+      - name: LoginRequest
+        contentType: application/json
+        schema:
+          type: object
+          required: [email, password]
+          properties:
+            email:
+              type: string
+              format: email
+              example: usuario@parking.com
+            password:
+              type: string
+              example: "123456"
+      - name: RefreshRequest
+        contentType: application/json
+        schema:
+          type: object
+          required: [refreshToken]
+          properties:
+            refreshToken:
+              type: string
+              example: "uuid-del-refresh-token"
+      - name: LogoutRequest
+        contentType: application/json
+        schema:
+          type: object
+          required: [refreshToken]
+          properties:
+            refreshToken:
+              type: string
+              example: "uuid-del-refresh-token"
 
 functions:
   register:
@@ -31,6 +89,20 @@ functions:
       - httpApi:
           path: /auth/register
           method: POST
+          documentation:
+            summary: Registrar usuario
+            description: Crea un nuevo usuario con email y contraseña hasheada
+            requestBody:
+              description: Credenciales del nuevo usuario
+            requestModels:
+              application/json: RegisterRequest
+            methodResponses:
+              - statusCode: 201
+                responseBody:
+                  description: Usuario creado exitosamente
+              - statusCode: 409
+                responseBody:
+                  description: Email ya registrado
 
   login:
     handler: src/handlers/auth.login
@@ -38,6 +110,20 @@ functions:
       - httpApi:
           path: /auth/login
           method: POST
+          documentation:
+            summary: Iniciar sesión
+            description: Autentica un usuario y retorna access token (15 min) y refresh token (7 días)
+            requestBody:
+              description: Credenciales del usuario
+            requestModels:
+              application/json: LoginRequest
+            methodResponses:
+              - statusCode: 200
+                responseBody:
+                  description: Tokens generados
+              - statusCode: 401
+                responseBody:
+                  description: Credenciales inválidas
 
   refresh:
     handler: src/handlers/auth.refresh
@@ -45,6 +131,20 @@ functions:
       - httpApi:
           path: /auth/refresh
           method: POST
+          documentation:
+            summary: Renovar access token
+            description: Emite un nuevo access token usando el refresh token vigente
+            requestBody:
+              description: Refresh token activo
+            requestModels:
+              application/json: RefreshRequest
+            methodResponses:
+              - statusCode: 200
+                responseBody:
+                  description: Nuevo access token
+              - statusCode: 401
+                responseBody:
+                  description: Refresh token inválido o expirado
 
   logout:
     handler: src/handlers/auth.logout
@@ -52,6 +152,20 @@ functions:
       - httpApi:
           path: /auth/logout
           method: POST
+          documentation:
+            summary: Cerrar sesión
+            description: Invalida el refresh token activo del usuario
+            requestBody:
+              description: Refresh token a invalidar
+            requestModels:
+              application/json: LogoutRequest
+            methodResponses:
+              - statusCode: 200
+                responseBody:
+                  description: Sesión cerrada
+              - statusCode: 404
+                responseBody:
+                  description: Token no encontrado
 
   me:
     handler: src/handlers/auth.me
@@ -59,10 +173,20 @@ functions:
       - httpApi:
           path: /auth/me
           method: GET
+          documentation:
+            summary: Obtener perfil
+            description: Retorna los datos del usuario autenticado. Requiere Authorization Bearer token
+            methodResponses:
+              - statusCode: 200
+                responseBody:
+                  description: Datos del usuario
+              - statusCode: 401
+                responseBody:
+                  description: Token inválido o no proporcionado
 
-  health:
-    handler: src/handlers/auth.health
+  docs:
+    handler: src/handlers/docs.swaggerUI
     events:
       - httpApi:
-          path: /
+          path: /docs
           method: GET

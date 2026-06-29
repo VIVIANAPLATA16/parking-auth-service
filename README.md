@@ -3,14 +3,20 @@
 Microservicio de autenticación centralizado para Parking International.
 Construido con Node.js, TypeScript y Serverless Framework v4.
 
+## Demo en producción
+
+**API:** https://o4w7jpo7m4.execute-api.us-east-1.amazonaws.com
+
+**Swagger / Docs:** https://o4w7jpo7m4.execute-api.us-east-1.amazonaws.com/docs
+
 ## Stack
 
 - Node.js 20 + TypeScript
-- Serverless Framework v4 + serverless-offline
-- Prisma 7 + PostgreSQL 15
+- Serverless Framework v4 — AWS Lambda + API Gateway
+- Prisma 7 + PostgreSQL (Neon en producción / Docker en local)
 - JWT — access token 15 min + refresh token 7 días
-- bcryptjs — hash seguro de contraseñas
-- Docker + Docker Compose
+- bcryptjs — hash seguro de contraseñas (salt rounds 12)
+- Docker + Docker Compose — base de datos local
 
 ## Requisitos
 
@@ -33,7 +39,7 @@ Construido con Node.js, TypeScript y Serverless Framework v4.
 
     cp .env.example .env
 
-**4. Levanta la base de datos**
+**4. Levanta la base de datos local**
 
     docker compose up -d
 
@@ -45,18 +51,19 @@ Construido con Node.js, TypeScript y Serverless Framework v4.
 
     npm run db:generate
 
-**7. Inicia el servidor**
+**7. Inicia el servidor local**
 
     npm run dev -- --httpPort 3001
 
-El servidor queda disponible en http://localhost:3001
+Disponible en http://localhost:3001
 
 ## Endpoints
 
-### POST /auth/register
-Registra un nuevo usuario.
+Disponibles en producción: https://o4w7jpo7m4.execute-api.us-east-1.amazonaws.com
 
-    curl -X POST http://localhost:3001/auth/register \
+### POST /auth/register
+
+    curl -X POST https://o4w7jpo7m4.execute-api.us-east-1.amazonaws.com/auth/register \
       -H "Content-Type: application/json" \
       -d '{"email": "usuario@ejemplo.com", "password": "123456"}'
 
@@ -64,12 +71,9 @@ Respuesta 201:
 
     { "message": "Usuario registrado exitosamente", "user": { "id": "uuid", "email": "...", "createdAt": "..." } }
 
----
-
 ### POST /auth/login
-Autentica un usuario y retorna access token y refresh token.
 
-    curl -X POST http://localhost:3001/auth/login \
+    curl -X POST https://o4w7jpo7m4.execute-api.us-east-1.amazonaws.com/auth/login \
       -H "Content-Type: application/json" \
       -d '{"email": "usuario@ejemplo.com", "password": "123456"}'
 
@@ -77,12 +81,9 @@ Respuesta 200:
 
     { "accessToken": "eyJ...", "refreshToken": "uuid" }
 
----
-
 ### POST /auth/refresh
-Emite un nuevo access token usando el refresh token vigente.
 
-    curl -X POST http://localhost:3001/auth/refresh \
+    curl -X POST https://o4w7jpo7m4.execute-api.us-east-1.amazonaws.com/auth/refresh \
       -H "Content-Type: application/json" \
       -d '{"refreshToken": "uuid"}'
 
@@ -90,12 +91,9 @@ Respuesta 200:
 
     { "accessToken": "eyJ..." }
 
----
-
 ### POST /auth/logout
-Invalida el refresh token activo del usuario.
 
-    curl -X POST http://localhost:3001/auth/logout \
+    curl -X POST https://o4w7jpo7m4.execute-api.us-east-1.amazonaws.com/auth/logout \
       -H "Content-Type: application/json" \
       -d '{"refreshToken": "uuid"}'
 
@@ -103,30 +101,25 @@ Respuesta 200:
 
     { "message": "Sesión cerrada exitosamente" }
 
----
-
 ### GET /auth/me
-Retorna los datos del usuario autenticado. Requiere access token válido.
 
-    curl -X GET http://localhost:3001/auth/me \
+    curl -X GET https://o4w7jpo7m4.execute-api.us-east-1.amazonaws.com/auth/me \
       -H "Authorization: Bearer eyJ..."
 
 Respuesta 200:
 
     { "user": { "id": "uuid", "email": "...", "createdAt": "...", "updatedAt": "..." } }
 
----
-
 ## Variables de entorno
 
 | Variable | Descripción | Ejemplo |
 |---|---|---|
-| DATABASE_URL | URL de conexión a PostgreSQL | postgresql://user:pass@localhost:5434/parking_auth |
+| DATABASE_URL | URL de conexión a PostgreSQL | postgresql://user:pass@host/db |
 | JWT_ACCESS_SECRET | Secreto para firmar access tokens | secreto_seguro |
 | JWT_REFRESH_SECRET | Secreto para firmar refresh tokens | otro_secreto |
 | JWT_ACCESS_EXPIRES_IN | Duración del access token | 15m |
 | JWT_REFRESH_EXPIRES_IN | Duración del refresh token | 7d |
-| PORT | Puerto del servidor | 3000 |
+| PORT | Puerto del servidor local | 3000 |
 
 ## Estructura del proyecto
 
@@ -136,7 +129,8 @@ Respuesta 200:
     │   └── schema.prisma
     ├── src/
     │   ├── handlers/
-    │   │   └── auth.ts
+    │   │   ├── auth.ts
+    │   │   └── docs.ts
     │   ├── services/
     │   │   ├── jwt.service.ts
     │   │   └── prisma.service.ts
